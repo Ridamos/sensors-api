@@ -1,0 +1,17 @@
+# залежності та результат збірки — відновлюються командами npm install / npm run build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# локальні змінні середовища (можуть містити секрети)
+.env
+.env.*
+!.env.example
+
+# службові файли
+npm-debug.log*
+coverage/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
