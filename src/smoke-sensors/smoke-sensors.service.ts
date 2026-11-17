@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { SmokeSensor } from './entities/smoke-sensor.entity.js';
 import { CreateSmokeSensorDto } from './dto/create-smoke-sensor.dto.js';
 import { UpdateSmokeSensorDto } from './dto/update-smoke-sensor.dto.js';
@@ -10,49 +11,63 @@ const DEFAULT_THRESHOLD: Record<string, number> = {
   '%/m': 4,
 };
 
+// Скільки останніх показань віддавати клієнту.
+const LAST_RECORDS = 50;
+
 @Injectable()
 export class SmokeSensorsService {
-  private sensors: SmokeSensor[] = [];
+  // Замість масиву в пам'яті — репозиторій таблиці "smoke-sensors".
+  constructor(
+    @InjectRepository(SmokeSensor)
+    private readonly smokeSensorRepository: Repository<SmokeSensor>,
+  ) {}
 
-  create(dto: CreateSmokeSensorDto): SmokeSensor {
+  async create(dto: CreateSmokeSensorDto): Promise<SmokeSensor> {
     const threshold = dto.threshold ?? DEFAULT_THRESHOLD[dto.unit];
-    const sensor: SmokeSensor = {
+    const record = this.smokeSensorRepository.create({
       ...dto,
-      id: uuidv4(),
-      timestamp: new Date(),
       threshold,
+      // Правило з лаб. №1. У базу записується вже готовий результат.
       alarm: dto.value >= threshold,
-    };
-    this.sensors.push(sensor);
-    return sensor;
+    });
+    return await this.smokeSensorRepository.save(record);
   }
 
-  findAll(): SmokeSensor[] {
-    return this.sensors;
+  async findAll(): Promise<SmokeSensor[]> {
+    const records = await this.smokeSensorRepository.find({
+      order: { createdAt: 'DESC' },
+      take: LAST_RECORDS,
+    });
+    return records.reverse(); // від старих до нових, як чекає клієнт
   }
 
-  /** Лише ті давачі, що зараз у стані тривоги */
-  findAlarms(): SmokeSensor[] {
-    return this.sensors.filter((s) => s.alarm);
+  /** Лише показання в стані тривоги: SELECT … WHERE "alarm" = true */
+  async findAlarms(): Promise<SmokeSensor[]> {
+    const records = await this.smokeSensorRepository.find({
+      where: { alarm: true },
+      order: { createdAt: 'DESC' },
+      take: LAST_RECORDS,
+    });
+    return records.reverse();
   }
 
-  findOne(id: string): SmokeSensor {
-    const sensor = this.sensors.find((s) => s.id === id);
+  async findOne(id: string): Promise<SmokeSensor> {
+    const sensor = await this.smokeSensorRepository.findOneBy({ id });
     if (!sensor)
       throw new NotFoundException(`smoke sensor with id ${id} not found`);
     return sensor;
   }
 
-  update(id: string, dto: UpdateSmokeSensorDto): SmokeSensor {
-    const sensor = this.findOne(id);
+  async update(id: string, dto: UpdateSmokeSensorDto): Promise<SmokeSensor> {
+    const sensor = await this.findOne(id);
     Object.assign(sensor, dto);
     sensor.timestamp = new Date(); // нове показання — новий час
     sensor.alarm = sensor.value >= sensor.threshold; // перераховуємо тривогу
-    return sensor;
+    return await this.smokeSensorRepository.save(sensor);
   }
 
-  remove(id: string): void {
-    const sensor = this.findOne(id);
-    this.sensors = this.sensors.filter((s) => s.id !== sensor.id);
+  async remove(id: string): Promise<void> {
+    const sensor = await this.findOne(id);
+    await this.smokeSensorRepository.remove(sensor);
   }
 }

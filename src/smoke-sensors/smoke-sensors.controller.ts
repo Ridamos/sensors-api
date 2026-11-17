@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { SmokeSensorsService } from './smoke-sensors.service.js';
 import { CreateSmokeSensorDto } from './dto/create-smoke-sensor.dto.js';
@@ -32,17 +33,20 @@ export class SmokeSensorsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.smokeSensorsService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateSmokeSensorDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateSmokeSensorDto,
+  ) {
     return this.smokeSensorsService.update(id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.smokeSensorsService.remove(id);
   }
 }

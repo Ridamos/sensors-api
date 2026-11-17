@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsIn,
   Min,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -13,10 +14,12 @@ export const SMOKE_UNITS = ['ppm', '%/m'] as const;
 export class CreateSmokeSensorDto {
   @IsNotEmpty()
   @IsString()
+  @MaxLength(200) // довжина колонки sensorName у базі
   sensorName: string;
 
   @IsNotEmpty()
   @IsString()
+  @MaxLength(200) // довжина колонки location у базі
   location: string;
 
   @IsNotEmpty()

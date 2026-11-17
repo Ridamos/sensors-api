@@ -13,8 +13,6 @@ async function bootstrap() {
     }),
   );
   // Лаб. №3: CORS — дозвіл браузеру звертатися до API з іншого домену.
-  // Клієнт працює на Vercel (або на localhost), сервер — на Render: це різні
-  // джерела (origin), і без цього дозволу браузер заблокує відповідь сервера.
   // FRONTEND_URL не задано → '*' (дозволено всім, прийнятно для навчального проєкту).
   app.enableCors({
     origin: process.env.FRONTEND_URL || '*',
@@ -22,5 +20,6 @@ async function bootstrap() {
   });
   // Render сам задає змінну PORT (10000); локально сервер слухає 3000.
   await app.listen(process.env.PORT ?? 3000);
+  console.log(`Application is running on: ${await app.getUrl()}`);
 }
 await bootstrap();
