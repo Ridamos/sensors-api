@@ -14,11 +14,12 @@ async function bootstrap() {
   );
   // Лаб. №3: CORS — дозвіл браузеру звертатися до API з іншого домену.
   // FRONTEND_URL не задано → '*' (дозволено всім, прийнятно для навчального проєкту).
+  // Лаб. №6: SSE — це теж GET-запит із браузера, тому дозвіл діє і на EventSource.
   app.enableCors({
     origin: process.env.FRONTEND_URL || '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   });
-  // Render сам задає змінну PORT (10000); локально сервер слухає 3000.
+  // Render сам задає змінну PORT (10000); локально і в Docker сервер слухає 3000.
   await app.listen(process.env.PORT ?? 3000);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }

@@ -1,9 +1,21 @@
-# sensors-api — серверний застосунок (NestJS + PostgreSQL)
+# sensors-api — серверний застосунок (NestJS + PostgreSQL + SSE)
 
-REST API для давачів температури та диму. З лаб. №5 показання зберігаються в
-базі даних PostgreSQL на Render через TypeORM, а не в масивах у пам'яті.
+REST API для давачів температури та диму. Показання зберігаються в базі даних
+PostgreSQL через TypeORM (лаб. №5). З лаб. №6 сервер ще й сповіщає клієнтів про
+критичні показання в реальному часі — через Server-Sent Events.
 
-## Запуск локально
+## Запуск у Docker
+
+З папки на рівень вище (там лежить `docker-compose.yml`):
+
+```
+docker compose up --build
+```
+
+Сервер: http://localhost:3000. База даних запускається в сусідньому
+контейнері, файл `.env` не потрібен.
+
+## Запуск локально без Docker
 
 ```
 npm install
@@ -28,7 +40,7 @@ npm run start:dev
 | `DB_NAME` | назва бази (поле Database на Render) |
 | `PORT` | порт сервера; Render задає сам, локально 3000 |
 | `FRONTEND_URL` | необов'язково: обмежує CORS одним доменом; без неї дозволено всім |
-| `DB_SSL` | необов'язково: `false` лише для локального PostgreSQL без шифрування |
+| `DB_SSL` | необов'язково: `false` лише для локального PostgreSQL без шифрування (так задано в `docker-compose.yml`) |
 
 Локально змінні лежать у `.env` (не потрапляє в Git), на Render — у розділі
 **Environment** веб-сервісу.
@@ -43,7 +55,9 @@ npm run start:dev
 | Instance Type | Free |
 | Environment Variables | п'ять змінних `DB_…` |
 
-Версія Node береться з файлу `.node-version`.
+Версія Node береться з файлу `.node-version`. У полі **Language** лишайте
+**Node**, як у лаб. №5. Варіант **Docker** там теж є — тоді Render сам збирає
+образ із `Dockerfile`, — але для лабораторної він не потрібен.
 
 ## Ендпоінти
 
@@ -52,18 +66,51 @@ npm run start:dev
 | GET    | /                           | Hello World (перевірка сервера)        |
 | POST   | /temperature-sensors        | додати показання температури           |
 | GET    | /temperature-sensors        | останні 50 показань, від старих до нових |
+| GET    | /temperature-sensors/alerts | **SSE:** потік сповіщень про температуру ≤ −10 °C |
 | GET    | /temperature-sensors/:id    | показання за id                        |
 | PATCH  | /temperature-sensors/:id    | оновити                                |
 | DELETE | /temperature-sensors/:id    | видалити                               |
 | POST   | /smoke-sensors              | додати показання диму                  |
 | GET    | /smoke-sensors              | останні 50 показань диму               |
 | GET    | /smoke-sensors/alarms       | останні 50 показань у стані тривоги    |
+| GET    | /smoke-sensors/alerts       | **SSE:** потік сповіщень про дим на порозі або вище |
 | GET    | /smoke-sensors/:id          | показання за id                        |
 | PATCH  | /smoke-sensors/:id          | оновити (тривога перераховується)      |
 | DELETE | /smoke-sensors/:id          | видалити                               |
 
 Давач температури доступний також за старою адресою `/sensors` (як у лаб. №1).
 `:id` має бути UUID, інакше відповідь `400`.
+
+## Сповіщення SSE (лаб. №6)
+
+| Файл | Роль |
+|---|---|
+| `src/temperature-sensors/temperature-alerts.service.ts` | потік подій про температуру (RxJS `Subject`) |
+| `src/smoke-sensors/smoke-alerts.service.ts` | потік подій про дим |
+| `src/*/…sensors.service.ts` | після `save()` перевіряє показання і викликає `emitAlert()` |
+| `src/*/…sensors.controller.ts` | метод з `@Sse('alerts')` віддає потік клієнтам |
+| `src/common/sse-keep-alive.ts` | рядок-коментар кожні 15 с, щоб проксі-сервери не рвали з'єднання |
+
+Перевірка в терміналі (у PowerShell саме `curl.exe`):
+
+```
+curl.exe -N http://localhost:3000/temperature-sensors/alerts
+```
+
+Команда «зависає» — це відкрите з'єднання. Надішліть в іншому вікні POST із
+температурою −10 або нижче, і в першому з'явиться рядок `data: {…}`.
+
+Подія про температуру:
+
+```json
+{"message":"Critical temperature! Value -15.5 C","temperature":-15.5,"sensorName":"DHT22","timestamp":"2026-10-11T10:31:06.722Z","severity":"critical"}
+```
+
+Подія про дим:
+
+```json
+{"message":"Smoke alarm! Value 420 ppm (threshold 300 ppm)","value":420,"unit":"ppm","threshold":300,"sensorName":"MQ-2","location":"Wokwi","timestamp":"2026-10-11T10:31:06.757Z","severity":"critical"}
+```
 
 ## Таблиці
 
@@ -93,3 +140,4 @@ double precision, `alarm` boolean.
 | `npm run db:check` | перевірка підключення і вміст таблиць |
 | `node scripts/make-env.mjs "…"` | створити `.env` з External Database URL |
 | `npm run lint` | перевірка коду |
+| `npm test` | модульні тести правил сповіщення (без бази даних) |

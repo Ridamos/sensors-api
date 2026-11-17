@@ -1,0 +1,24 @@
+# Що НЕ потрапляє в образ під час збирання (docker build).
+
+# Залежності й результат збирання створюються всередині образу.
+node_modules
+dist
+*.tsbuildinfo
+coverage
+
+# Локальні налаштування з паролем до бази. Контейнер отримує їх з docker-compose.yml.
+.env
+.env.*
+!.env.example
+
+# Для роботи сервера не потрібні.
+.git
+.gitignore
+.vscode
+.idea
+test
+scripts
+README.md
+Dockerfile
+.dockerignore
+npm-debug.log*
